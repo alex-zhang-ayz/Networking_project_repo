@@ -1,6 +1,9 @@
 import dpkt
 import datetime
 import socket
+import numpy as np
+import matplotlib.pyplot as plt
+
 from dpkt.compat import compat_ord #this only used in the below helper functions for printing data
 
 #these two are helper functions copied from the examples on dpkt.readthedocs.io, may not be needed but should be cited
@@ -29,6 +32,16 @@ def inet_to_str(inet):
         return socket.inet_ntop(socket.AF_INET6, inet)
 
 
+
+#-----------------------------------------
+def plot_cdf_with_data(data):
+    #http://stanford.edu/~raejoon/blog/2017/05/16/python-recipes-for-cdfs.html
+    num_bins = len(data)
+    counts, bin_edges = np.histogram (data, bins=num_bins, normed=True)
+    cdf = np.cumsum (counts)
+    plt.plot (bin_edges[1:], cdf/cdf[-1])    
+
+
 path_to_file='univ1_pt9'
 f = open(path_to_file,'rb')
 pcap = dpkt.pcap.Reader(f)
@@ -38,16 +51,28 @@ link_layer_dict = {}
 network_layer_dict = {}
 transport_layer_dict = {}
 
+all_packet_sizes = []
+tcp_packet_sizes = []
+udp_packet_sizes = []
+ip_packet_sizes = []
+non_ip_packet_sizes = []
+
+ip_header_sizes = []
+tcp_header_sizes = []
+udp_header_sizes = []
+
+
 print('parsing file...')
 counter = 0
 for ts, buf in pcap:
     if (counter > 500):
         break
     
-    #counter += 1
+    counter += 1
+
+    all_packet_sizes.append(len(buf))
     
     isEthernet = False
-    
     
     #link layer counts
     link_key = ''
@@ -87,6 +112,9 @@ for ts, buf in pcap:
                 ip_key = 'ICMP'
             else :
                 ip_key = 'IPv4'
+            
+            ip_header_sizes.append(eth.data.__hdr_len__)
+            ip_packet_sizes.append(len(buf))
         else :
             #not ipv4 
             if (eth.type == dpkt.ethernet.ETH_TYPE_IP6):
@@ -95,8 +123,13 @@ for ts, buf in pcap:
                     ip_key = 'ICMP'
                 else :
                     ip_key = 'IPv6'
+                    
+                ip_header_sizes.append(eth.data.__hdr_len__)
+                ip_packet_sizes.append(len(buf))
             else :
                 ip_key = 'Other'
+                
+                non_ip_packet_sizes.append(len(buf))
         
         if (ip_key in network_layer_dict):
             val = network_layer_dict[ip_key]
@@ -114,8 +147,15 @@ for ts, buf in pcap:
             transport_key = ''
             if (ip.p == dpkt.ip.IP_PROTO_TCP):
                 transport_key = 'TCP'
+                
+                tcp_header_sizes.append(ip.data.__hdr_len__)
+                tcp_packet_sizes.append(len(buf))
+                
             elif (ip.p == dpkt.ip.IP_PROTO_UDP):
                 transport_key = 'UDP'
+                
+                udp_header_sizes.append(ip.data.__hdr_len__)
+                udp_packet_sizes.append(len(buf))
             else :
                 transport_key = 'Other'
         
@@ -126,8 +166,7 @@ for ts, buf in pcap:
             #update total bytes
             val[1] = val[1] + len(buf)
         else :
-            transport_layer_dict[transport_key] = [1, len(buf)]          
-        
+            transport_layer_dict[transport_key] = [1, len(buf)]      
         
         #do_not_fragment = bool(ip.off & dpkt.ip.IP_DF)
         #more_fragments = bool(ip.off & dpkt.ip.IP_MF)
@@ -172,3 +211,7 @@ for key in transport_layer_dict:
     print(key, transport_layer_dict[key])    
     
 print('------------------------------')
+
+#plot_cdf_with_data(all_packet_sizes)
+
+#plot_cdf_with_data(udp_header_sizes)
