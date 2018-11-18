@@ -1,0 +1,5 @@
+https://engineering-notebook.readthedocs.io/en/latest/engineering/dpkt.html
+https://jon.oberheide.org/blog/2008/10/15/dpkt-tutorial-2-parsing-a-pcap-file/
+http://stanford.edu/~raejoon/blog/2017/05/16/python-recipes-for-cdfs.html
+http://www.commercialventvac.com/dpkt.html#mozTocId883199
+https://dpkt.readthedocs.io/en/latest/examples.html
