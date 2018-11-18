@@ -1,1 +1,4 @@
-Empty readme...
+Dependencies:
+  - dpkt
+  - numpy
+  - matplotlib
