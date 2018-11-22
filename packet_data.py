@@ -31,6 +31,11 @@ class FlowData:
         self.total_packets = len(pd_list)
         self.total_bytes = sum(p.size for p in pd_list)
         
+        
+        pkt1 = pd_list[0]
+        pkt_lst = pd_list[len(pd_list) - 1]
+        self.duration = pkt_lst.ts - pkt1.ts
+        
         total_d_size = sum(p.d_size for p in pd_list)
         if (total_d_size <= 0):
             self.overhead_ratio = 9999
@@ -41,4 +46,4 @@ class FlowData:
         #need to add in the TCP headers into the packet object
         
     def __str__(self):
-        return self.flow_key + '___' + str(self.protocol) + '___' + str(self.total_packets) + '___' + str(self.total_bytes) + '___' + str(self.overhead_ratio)
+        return self.flow_key + '___' + str(self.protocol) + '___' + str(self.total_packets) + '___' + str(self.total_bytes) + '___' + str(self.overhead_ratio) + '___' + str(self.duration)
