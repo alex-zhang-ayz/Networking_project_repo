@@ -4,6 +4,7 @@ import socket
 import numpy as np
 import matplotlib.pyplot as plt
 
+import packet_data as pd
 from dpkt.compat import compat_ord #this only used in the below helper functions for printing data
 
 #these two are helper functions copied from the examples on dpkt.readthedocs.io, may not be needed but should be cited
@@ -36,8 +37,8 @@ def inet_to_str(inet):
 #-----------------------------------------
 def plot_cdf_with_data(data):
     #http://stanford.edu/~raejoon/blog/2017/05/16/python-recipes-for-cdfs.html
-    num_bins = len(data)
-    counts, bin_edges = np.histogram (data, bins=num_bins, normed=True)
+    num_bins = 10
+    counts, bin_edges = np.histogram (data, bins=num_bins)
     cdf = np.cumsum (counts)
     plt.plot (bin_edges[1:], cdf/cdf[-1])    
 
@@ -61,11 +62,16 @@ ip_header_sizes = []
 tcp_header_sizes = []
 udp_header_sizes = []
 
+moving_tcp_flows = {}
+moving_udp_flows = {}
+
+completed_tcp_flows = []
+completed_udp_flows = []
 
 print('parsing file...')
 counter = 0
 for ts, buf in pcap:
-    if (counter > 500):
+    if (counter > 50000):
         break
     
     counter += 1
@@ -151,11 +157,81 @@ for ts, buf in pcap:
                 tcp_header_sizes.append(ip.data.__hdr_len__)
                 tcp_packet_sizes.append(len(buf))
                 
+                tcp = ip.data
+                h_size = ip.data.__hdr_len__ + eth.data.__hdr_len__ + eth.__hdr_len__
+                d_size = len(tcp.data)
+                #print ('h_size =',h_size,'d_size =', d_size)
+                pk = pd.PacketData(inet_to_str(ip.src), inet_to_str(ip.dst), tcp.sport, tcp.dport, 'TCP', ts, len(buf), h_size, d_size)
+                
+                keys = pk.flow_keys()
+                
+                hasKey = False
+                for key in keys:
+                    if (key in moving_tcp_flows):
+                        hasKey = True
+                        map_data = moving_tcp_flows[key]
+                        
+                        #check if over 90 mins since last packet
+                        if ((ts - map_data[0]) /60.0/1000 > 90):
+                            #construct flow object, save to: completed_tcp_flows
+                            #hasKey will still be False
+                            
+                            #print('90 mins! TCP!', str((ts - map_data[0]) /60.0/1000))
+                            
+                            f = pd.FlowData(map_data[1])
+                            completed_tcp_flows.append(f)                            
+                            
+                            break
+                        
+                        #update latest timestamp
+                        map_data[0] = ts
+                        map_data[1].append(pk)
+                
+                #dict does not have key or the flow has passed 90 mins since last packet
+                if not hasKey:
+                    moving_tcp_flows[keys[0]] = [ts, [pk]]
+                                
+                
             elif (ip.p == dpkt.ip.IP_PROTO_UDP):
                 transport_key = 'UDP'
                 
                 udp_header_sizes.append(ip.data.__hdr_len__)
                 udp_packet_sizes.append(len(buf))
+                
+                udp = ip.data
+                h_size = ip.data.__hdr_len__ + eth.data.__hdr_len__ + eth.__hdr_len__
+                d_size = len(udp.data)
+                #print ('h_size =',h_size,'d_size =', d_size)
+                pk = pd.PacketData(inet_to_str(ip.src), inet_to_str(ip.dst), udp.sport, udp.dport, 'UDP', ts, len(buf), h_size, d_size)   
+                
+                keys = pk.flow_keys()
+                
+                hasKey = False
+                for key in keys:
+                    if (key in moving_udp_flows):
+                        hasKey = True
+                        map_data = moving_udp_flows[key]
+                        
+                        #check if over 90 mins since last packet
+                        if ((ts - map_data[0]) /60.0/1000 > 90):
+                            #construct flow object, save to: completed_tcp_flows
+                            #hasKey will still be False
+                            
+                            #print('90 mins! UDP!', str((ts - map_data[0]) /60.0/1000))
+                            
+                            f = pd.FlowData(map_data[1])
+                            completed_udp_flows.append(f)
+                            
+                            break
+                        
+                        #update latest timestamp
+                        map_data[0] = ts
+                        map_data[1].append(pk)
+                
+                #dict does not have key or the flow has passed 90 mins since last packet
+                if not hasKey:
+                    moving_udp_flows[keys[0]] = [ts, [pk]]
+                
             else :
                 transport_key = 'Other'
         
@@ -175,26 +251,18 @@ for ts, buf in pcap:
         #print ('IP: %s -> %s   (len=%d ttl=%d DF=%d MF=%d offset=%d)\n' % \
                   #(inet_to_str(ip.src), inet_to_str(ip.dst), ip.len, ip.ttl, do_not_fragment, more_fragments, fragment_offset)  )          
     
-    
 
-    '''
-    print ('Ethernet Frame: ', mac_addr(eth.src), mac_addr(eth.dst), eth.type)
-    
-    if not isinstance(eth.data, dpkt.ip.IP):
-        print ('Non IP Packet type not supported %s\n' % eth.data.__class__.__name__)
-        continue    
-    
-    ip = eth.data
+#translate flows remaining in moving flow lists to flow objects and add to flow list
+for key in moving_tcp_flows:
+    map_data = moving_tcp_flows[key]
+    f = pd.FlowData(map_data[1])
+    completed_tcp_flows.append(f)    
 
-    do_not_fragment = bool(ip.off & dpkt.ip.IP_DF)
-    more_fragments = bool(ip.off & dpkt.ip.IP_MF)
-    fragment_offset = ip.off & dpkt.ip.IP_OFFMASK    
-    
-    print ('IP: %s -> %s   (len=%d ttl=%d DF=%d MF=%d offset=%d)\n' % \
-              (inet_to_str(ip.src), inet_to_str(ip.dst), ip.len, ip.ttl, do_not_fragment, more_fragments, fragment_offset)  )  
-    
-    counter += 1
-    '''
+for key in moving_udp_flows:
+    map_data = moving_udp_flows[key]
+    f = pd.FlowData(map_data[1])
+    completed_udp_flows.append(f)  
+
 
     
 print('printing set...')
@@ -212,6 +280,40 @@ for key in transport_layer_dict:
     
 print('------------------------------')
 
+for flow in completed_tcp_flows:
+    print(flow)
+
+for flow in completed_udp_flows:
+    print(flow)
+
+
+
+'''
+print(len(moving_tcp_flows))
+print(len(moving_udp_flows))
+
+max_ts_diff = 0
+for flow in moving_tcp_flows:
+    last_ts = moving_tcp_flows[flow][0]
+    first_ts = moving_tcp_flows[flow][1][0].ts
+    if (last_ts - first_ts > max_ts_diff):
+        max_ts_diff = last_ts - first_ts
+        
+    #print(moving_tcp_flows[flow][1][0], last_ts - first_ts)
+print(max_ts_diff)
+
+max_ts_diff = 0
+for flow in moving_udp_flows:
+    last_ts = moving_udp_flows[flow][0]
+    first_ts = moving_udp_flows[flow][1][0].ts
+    if (last_ts - first_ts > max_ts_diff):
+        max_ts_diff = last_ts - first_ts
+    
+    #print(moving_udp_flows[flow][1][0], last_ts - first_ts)
+print(max_ts_diff)
+'''
+
 #plot_cdf_with_data(all_packet_sizes)
+#plot_cdf_with_data(tcp_packet_sizes)
 
 #plot_cdf_with_data(udp_header_sizes)
