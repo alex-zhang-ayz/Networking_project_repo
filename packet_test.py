@@ -163,6 +163,13 @@ for ts, buf in pcap:
                 #print ('h_size =',h_size,'d_size =', d_size)
                 pk = pd.PacketData(inet_to_str(ip.src), inet_to_str(ip.dst), tcp.sport, tcp.dport, 'TCP', ts, len(buf), h_size, d_size)
                 
+                fin = 1 if tcp.flags & dpkt.tcp.TH_FIN else 0
+                syn = 1 if tcp.flags & dpkt.tcp.TH_SYN else 0
+                rst = 1 if tcp.flags & dpkt.tcp.TH_RST else 0
+                ack = 1 if tcp.flags & dpkt.tcp.TH_ACK else 0
+                
+                pk.set_tcp_headers(fin, syn, rst, ack)
+                
                 keys = pk.flow_keys()
                 
                 hasKey = False
@@ -242,14 +249,7 @@ for ts, buf in pcap:
             #update total bytes
             val[1] = val[1] + len(buf)
         else :
-            transport_layer_dict[transport_key] = [1, len(buf)]      
-        
-        #do_not_fragment = bool(ip.off & dpkt.ip.IP_DF)
-        #more_fragments = bool(ip.off & dpkt.ip.IP_MF)
-        #fragment_offset = ip.off & dpkt.ip.IP_OFFMASK 
-        
-        #print ('IP: %s -> %s   (len=%d ttl=%d DF=%d MF=%d offset=%d)\n' % \
-                  #(inet_to_str(ip.src), inet_to_str(ip.dst), ip.len, ip.ttl, do_not_fragment, more_fragments, fragment_offset)  )          
+            transport_layer_dict[transport_key] = [1, len(buf)]          
     
 
 #translate flows remaining in moving flow lists to flow objects and add to flow list
@@ -283,8 +283,8 @@ print('------------------------------')
 for flow in completed_tcp_flows:
     print(flow)
 
-for flow in completed_udp_flows:
-    print(flow)
+#for flow in completed_udp_flows:
+    #print(flow)
 
 # Get the top 3 largest TCP flows in terms of packet number
 top3_in_packet_num = sorted(completed_tcp_flows, key=lambda flowData:flowData.total_packets)[-3:]
@@ -292,33 +292,11 @@ top3_in_packet_num = sorted(completed_tcp_flows, key=lambda flowData:flowData.to
 # Get the top 3 largest TCP flows in terms of total byte size
 top3_in_byteSize = sorted(completed_tcp_flows, key=lambda flowData:flowData.total_bytes)[-3:]
 
+
 # Get the top 3 largest TCP flows in terms of duration
 top3_in_duration = sorted(completed_tcp_flows, key=lambda flowData:flowData.duration)[-3:]
 
-'''
-print(len(moving_tcp_flows))
-print(len(moving_udp_flows))
-
-max_ts_diff = 0
-for flow in moving_tcp_flows:
-    last_ts = moving_tcp_flows[flow][0]
-    first_ts = moving_tcp_flows[flow][1][0].ts
-    if (last_ts - first_ts > max_ts_diff):
-        max_ts_diff = last_ts - first_ts
-        
-    #print(moving_tcp_flows[flow][1][0], last_ts - first_ts)
-print(max_ts_diff)
-
-max_ts_diff = 0
-for flow in moving_udp_flows:
-    last_ts = moving_udp_flows[flow][0]
-    first_ts = moving_udp_flows[flow][1][0].ts
-    if (last_ts - first_ts > max_ts_diff):
-        max_ts_diff = last_ts - first_ts
-    
-    #print(moving_udp_flows[flow][1][0], last_ts - first_ts)
-print(max_ts_diff)
-'''
+print('------------------------------')
 
 #plot_cdf_with_data(all_packet_sizes)
 #plot_cdf_with_data(tcp_packet_sizes)
