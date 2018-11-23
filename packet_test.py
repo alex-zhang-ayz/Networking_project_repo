@@ -264,7 +264,7 @@ for key in moving_udp_flows:
     completed_udp_flows.append(f)  
 
 
-    
+
 print('printing set...')
     
 for key in link_layer_dict:
@@ -286,7 +286,14 @@ for flow in completed_tcp_flows:
 for flow in completed_udp_flows:
     print(flow)
 
+# Get the top 3 largest TCP flows in terms of packet number
+top3_in_packet_num = sorted(completed_tcp_flows, key=lambda flowData:flowData.total_packets)[-3:]
 
+# Get the top 3 largest TCP flows in terms of total byte size
+top3_in_byteSize = sorted(completed_tcp_flows, key=lambda flowData:flowData.total_bytes)[-3:]
+
+# Get the top 3 largest TCP flows in terms of duration
+top3_in_duration = sorted(completed_tcp_flows, key=lambda flowData:flowData.duration)[-3:]
 
 '''
 print(len(moving_tcp_flows))
