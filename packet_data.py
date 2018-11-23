@@ -14,6 +14,9 @@ class PacketData:
         self.syn = 0
         self.rst = 0
         self.ack = 0
+        
+        self.seq_val = -1
+        self.ack_val = -1
     
     def flow_keys(self):
         key1 = str(self.src_ip) + "|" + str(self.dest_ip) + "|" + str(self.src_port) + "|" + str(self.dest_port) + "|" + self.protocol
@@ -30,9 +33,14 @@ class PacketData:
         self.rst = rst
         self.ack = ack
         
+    def set_tcp_values(self, seq, ack):
+        self.seq_val = seq
+        self.ack_val = ack
+        
     def print_tcp_header(self):
         if (self.protocol == 'TCP'):
             print(('_FIN_' if self.fin else '') + ('_SYN_' if self.syn else '') + ('_RST_' if self.rst else '') + ('_ACK_' if self.ack else ''))
+            print("seq num is %d" % self.seq_val + "___ ack num is %d" % self.ack_val)
     
 class FlowData:
     def __init__(self, pd_list):

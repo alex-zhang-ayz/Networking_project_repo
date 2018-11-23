@@ -71,7 +71,7 @@ completed_udp_flows = []
 print('parsing file...')
 counter = 0
 for ts, buf in pcap:
-    if (counter > 50000):
+    if (counter > 5000):
         break
     
     counter += 1
@@ -169,6 +169,7 @@ for ts, buf in pcap:
                 ack = 1 if tcp.flags & dpkt.tcp.TH_ACK else 0
                 
                 pk.set_tcp_headers(fin, syn, rst, ack)
+                pk.set_tcp_values(tcp.seq, tcp.ack)
                 
                 keys = pk.flow_keys()
                 
@@ -280,11 +281,14 @@ for key in transport_layer_dict:
     
 print('------------------------------')
 
-for flow in completed_tcp_flows:
-    print(flow)
+#for flow in completed_tcp_flows:
+    #print(flow)
 
 #for flow in completed_udp_flows:
     #print(flow)
+    
+    
+    
 
 # Get the top 3 largest TCP flows in terms of packet number
 top3_in_packet_num = sorted(completed_tcp_flows, key=lambda flowData:flowData.total_packets)[-3:]
@@ -296,7 +300,25 @@ top3_in_byteSize = sorted(completed_tcp_flows, key=lambda flowData:flowData.tota
 # Get the top 3 largest TCP flows in terms of duration
 top3_in_duration = sorted(completed_tcp_flows, key=lambda flowData:flowData.duration)[-3:]
 
+
+for flow in top3_in_packet_num:
+    print(flow.flow_key)
+    
+print('------------')
+    
+for flow in top3_in_byteSize:
+    print(flow.flow_key)
+    
+print('------------')
+        
+for flow in top3_in_duration:
+    print(flow.flow_key)        
+
 print('------------------------------')
+
+for pkt in top3_in_packet_num[0].pd_list:
+    print(pkt)
+    pkt.print_tcp_header()
 
 #plot_cdf_with_data(all_packet_sizes)
 #plot_cdf_with_data(tcp_packet_sizes)
