@@ -199,3 +199,9 @@ def measure_rtt_flow(flow):
     #print('___-------____')
     
     return rtt_map
+
+class HostPair:
+    def __init__(self, key, flow_list):
+        self.key = key
+        self.flow_list = flow_list
+        self.length = len(flow_list)

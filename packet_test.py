@@ -49,11 +49,11 @@ def plot_cdf_with_data(data, title, uselog=False):
 def draw_rtt_time(rtt_list, ts_list, title, uselog=False):
     plt.figure()
     plt.title(title)
-    plt.plot (rtt_list, ts_list)  
+    plt.plot (ts_list, rtt_list)  
     if (uselog):
         plt.xscale('log')    
 
-def generate_rtt_cdf(top3_flow_list, title):
+def generate_rtt_graph(top3_flow_list, title):
     print('Generating {0} flow RTT CDFs...'.format(title))
     acc = 0
     while (acc < len(top3_in_packet_num)):
@@ -72,11 +72,11 @@ def generate_rtt_cdf(top3_flow_list, title):
         
         s_rtt_val_list = [rttobj.rtt for rttobj in sample_rtt_list_fk1]
         s_ts_val_list = [rttobj.ts for rttobj in sample_rtt_list_fk1]
-        draw_rtt_time(s_ts_val_list, s_rtt_val_list, sample_flow1_title)
+        draw_rtt_time(s_rtt_val_list, s_ts_val_list, sample_flow1_title)
         
         est_rtt_val_list = [rttobj.rtt for rttobj in est_rtt_list_fk1]
         est_ts_val_list = [rttobj.ts for rttobj in est_rtt_list_fk1]
-        draw_rtt_time(est_ts_val_list, est_rtt_val_list, est_flow1_title)    
+        draw_rtt_time(est_rtt_val_list, est_ts_val_list, est_flow1_title)    
         
         #for second RTT for flow B->A
         sample_rtt_list_fk2 = f_rtt_map[flow.flow_key2][0]
@@ -84,11 +84,11 @@ def generate_rtt_cdf(top3_flow_list, title):
         
         s_rtt_val_list = [rttobj.rtt for rttobj in sample_rtt_list_fk2]
         s_ts_val_list = [rttobj.ts for rttobj in sample_rtt_list_fk2]
-        draw_rtt_time(s_ts_val_list, s_rtt_val_list, sample_flow2_title)
+        draw_rtt_time(s_rtt_val_list, s_ts_val_list, sample_flow2_title)
         
         est_rtt_val_list = [rttobj.rtt for rttobj in est_rtt_list_fk2]
         est_ts_val_list = [rttobj.ts for rttobj in est_rtt_list_fk2]
-        draw_rtt_time(est_ts_val_list, est_rtt_val_list, est_flow2_title)     
+        draw_rtt_time(est_rtt_val_list, est_ts_val_list, est_flow2_title)     
         
         acc += 1    
 
@@ -453,6 +453,7 @@ for key in state_map:
 print('------------------------------')
 
 # --- RTT Estimation ---
+print('Generating RTT graphs...')
 
 # Get the top 3 largest TCP flows in terms of packet number
 top3_in_packet_num = sorted(completed_tcp_flows, key=lambda flowData:flowData.total_packets)[-3:]
@@ -464,54 +465,89 @@ top3_in_byteSize = sorted(completed_tcp_flows, key=lambda flowData:flowData.tota
 top3_in_duration = sorted(completed_tcp_flows, key=lambda flowData:flowData.duration)[-3:]
 
 # Top 3 in Packet Num
-#generate_rtt_cdf(top3_in_packet_num, 'Top 3 in Packet Num')
+#generate_rtt_graph(top3_in_packet_num, 'Top 3 in Packet Num')
 
 # Top 3 in Byte Size
-#generate_rtt_cdf(top3_in_byteSize, 'Top 3 in Byte Size')
+#generate_rtt_graph(top3_in_byteSize, 'Top 3 in Byte Size')
 
 # Top 3 in Duration
-#generate_rtt_cdf(top3_in_duration, 'Top 3 in Duration')
-
-print('---------------------') 
-
-# Host Pair stats
-
-
-
+#generate_rtt_graph(top3_in_duration, 'Top 3 in Duration')
 
 print('------------------------------')
 
+# Host Pair stats
+print('Generating Host Pair RTT graphs...')
 
-
-
-# Rest of this doesn't matter
-
-
-
-#for flow in top3_in_packet_num:
-    #print(flow.flow_key1)
+host_pair_map = {}
+for flow in completed_tcp_flows:
+    f_hps = flow.host_pairs
     
-#print('------------')
+    matched = False
+    m_val = ''
+    for hp in f_hps:
+        if (hp in host_pair_map):
+            m_val = hp
+            matched = True
     
-#for flow in top3_in_byteSize:
-    #print(flow.flow_key1)
+    if (matched):
+        host_pair_map[m_val].append(flow)
+    else:
+        host_pair_map[f_hps[0]] = [flow]
+
+hp_list = []
+for key in host_pair_map:
+    #print('{0}, size={1}, {2}'.format(key, len(host_pair_map[key]), host_pair_map[key]))
+    hp = pd.HostPair(key, host_pair_map[key])
+    hp_list.append(hp)
     
-#print('------------')
+# Get the top 3 host-pairs in terms of # of flows
+top3_hp = sorted(hp_list, key=lambda hostPair:hostPair.length)[-3:]
+
+top3_acc = 3
+for hp in top3_hp:
+    rtt_list = []
+    ts_list = []
+    
+    for flow in hp.flow_list:
+        #find median RTT for this flow & start ts, add this info to a list
+        f_rtt_map = pd.measure_rtt_flow(flow)
         
-#for flow in top3_in_duration:
-    #print(flow.flow_key1)        
+        est_rtt_list_combined = []
+        
+        #for first RTT for flow A->B
+        est_rtt_list_fk1 = f_rtt_map[flow.flow_key1][1]
+        #for first RTT for flow B->A
+        est_rtt_list_fk2 = f_rtt_map[flow.flow_key2][1]
+        
+        for rtt in est_rtt_list_fk1:
+            est_rtt_list_combined.append(rtt.rtt)
+            
+        for rtt in est_rtt_list_fk2:
+            est_rtt_list_combined.append(rtt.rtt)
+            
+        if (len(est_rtt_list_combined) > 0):
+            med = np.median(est_rtt_list_combined)
+        else :
+            med = 0
+        
+        first_ts = flow.pd_list[0].ts
 
-#print('------------------------------')
+        #ignoring flows with no estimated rtt (likely no samples)
+        if (med > 0):
+            rtt_list.append(med)
+            ts_list.append(first_ts)
+    
+    title = 'Top 3 Host Pair Flow RTTs #{0}'.format(top3_acc)
+    
+    #draw_rtt_time(rtt_list, ts_list, title, uselog=False)
+    
+    #if (len(rtt_list) == 0):
+        #print(hp.key)
+        #print(hp.flow_list[0].flow_key1)
+        #print(hp.flow_list[0].flow_key2)
+    
+    top3_acc -= 1
+    
 
 
-
-#flow0 = top3_in_packet_num[0]
-#f0_rtt_map = pd.measure_rtt_flow(flow0)
-
-#sample_rtt_list_fk1 = f0_rtt_map[flow0.flow_key1][0]
-#est_rtt_list_fk1 = f0_rtt_map[flow0.flow_key1][1]
-#print('last sample =',sample_rtt_list_fk1[len(sample_rtt_list_fk1) - 1].rtt,'___','last est =',est_rtt_list_fk1[len(est_rtt_list_fk1) - 1].rtt)
-
-#sample_rtt_list_fk2 = f0_rtt_map[flow0.flow_key2][0]
-#est_rtt_list_fk2 = f0_rtt_map[flow0.flow_key2][1]
-#print('last sample =',sample_rtt_list_fk2[len(sample_rtt_list_fk2) - 1].rtt,'___','last est =',est_rtt_list_fk2[len(est_rtt_list_fk2) - 1].rtt)
+print('------------------------------')
