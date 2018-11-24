@@ -71,7 +71,7 @@ completed_udp_flows = []
 print('parsing file...')
 counter = 0
 for ts, buf in pcap:
-    if (counter > 5000):
+    if (counter > 50000):
         break
     
     counter += 1
@@ -302,25 +302,36 @@ top3_in_duration = sorted(completed_tcp_flows, key=lambda flowData:flowData.dura
 
 
 for flow in top3_in_packet_num:
-    print(flow.flow_key)
+    print(flow.flow_key1)
     
 print('------------')
     
 for flow in top3_in_byteSize:
-    print(flow.flow_key)
+    print(flow.flow_key1)
     
 print('------------')
         
 for flow in top3_in_duration:
-    print(flow.flow_key)        
+    print(flow.flow_key1)        
 
 print('------------------------------')
 
-for pkt in top3_in_packet_num[0].pd_list:
-    print(pkt)
-    pkt.print_tcp_header()
+#for pkt in top3_in_packet_num[0].pd_list:
+    #print(pkt)
+    #pkt.print_tcp_header()
 
 #plot_cdf_with_data(all_packet_sizes)
 #plot_cdf_with_data(tcp_packet_sizes)
 
 #plot_cdf_with_data(udp_header_sizes)
+
+flow0 = top3_in_packet_num[0]
+f0_rtt_map = pd.measure_rtt_flow(flow0)
+
+sample_rtt_list_fk1 = f0_rtt_map[flow0.flow_key1][0]
+est_rtt_list_fk1 = f0_rtt_map[flow0.flow_key1][1]
+print('last sample =',sample_rtt_list_fk1[len(sample_rtt_list_fk1) - 1].rtt,'___','last est =',est_rtt_list_fk1[len(est_rtt_list_fk1) - 1].rtt)
+
+sample_rtt_list_fk2 = f0_rtt_map[flow0.flow_key2][0]
+est_rtt_list_fk2 = f0_rtt_map[flow0.flow_key2][1]
+print('last sample =',sample_rtt_list_fk2[len(sample_rtt_list_fk2) - 1].rtt,'___','last est =',est_rtt_list_fk2[len(est_rtt_list_fk2) - 1].rtt)

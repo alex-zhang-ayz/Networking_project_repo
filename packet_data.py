@@ -24,6 +24,12 @@ class PacketData:
         keys = [key1, key2]
         return keys
     
+    def host_pairs(self):
+        hp1 = str(self.src_ip) + "|" + str(self.dest_ip)
+        hp2 = str(self.dest_ip) + "|" + str(self.src_ip)
+        hps = [hp1, hp2]
+        return hps
+    
     def __str__(self):
         return str(self.src_ip) + "|" + str(self.dest_ip) + "|" + str(self.src_port) + "|" + str(self.dest_port) + "|" + self.protocol + '|' + str(self.ts) + "|" + str(self.size) + '|' + str(self.h_size) + '|' + str(self.d_size)
     
@@ -48,7 +54,9 @@ class FlowData:
             return None
         
         pkt = pd_list[0]
-        self.flow_key = pkt.flow_keys()[0]
+        self.host_pairs = pkt.host_pairs()
+        self.flow_key1 = pkt.flow_keys()[0]
+        self.flow_key2 = pkt.flow_keys()[1]
         self.protocol = pkt.protocol
         self.pd_list = pd_list
         self.total_packets = len(pd_list)
@@ -99,3 +107,85 @@ class FlowData:
         
     def __str__(self):
         return self.flow_key + '___' + str(self.protocol) + '___' + str(self.total_packets) + '___' + str(self.total_bytes) + '___' + str(self.overhead_ratio) + '___' + str(self.duration) + '___' + self.tcp_class
+    
+
+class RTT:
+    def __init__(self, rtt, ts, flow_key):
+        self.rtt = rtt
+        self.ts = ts
+        self.flow_key = flow_key
+
+def measure_rtt_flow(flow):
+    packets = flow.pd_list
+    
+    #initializing structures
+    first_pkt = packets[0]
+    flow_key1 = first_pkt.flow_keys()[0]
+    flow_key2 = first_pkt.flow_keys()[1]
+    
+    flow_key_map = {}
+    flow_key_map[flow_key1] = {}
+    flow_key_map[flow_key2] = {}
+    
+    rtt_map = {}
+    #map stores list of lists, element 0 = sample RTT measurements, element 1 = estimated RTT measurements
+    rtt_map[flow_key1] = [[], []]
+    rtt_map[flow_key2] = [[], []]
+    
+    rto = 1
+    srtt = 0
+    rttvar = 0
+    G = 0.000001 #one microsecond as suggested in the discussion boards
+    first_measurement_made = False
+    
+    for pkt in packets:
+        direction = ''
+        reverse = ''
+        
+        if (flow_key1 == pkt.flow_keys()[0]):
+            direction = flow_key1
+            reverse = flow_key2
+        else:
+            direction = flow_key2
+            reverse = flow_key1
+        
+        #add seq to direction map if not in it... ignore otherwise
+        if (not (pkt.seq_val in flow_key_map[direction])):
+            flow_key_map[direction][pkt.seq_val] = pkt.ts
+        
+        #remove from reverse if ack in map & then calc RTT...ignore otherwise
+        if (pkt.ack_val in flow_key_map[reverse]):
+            rtt = pkt.ts - (flow_key_map[reverse])[pkt.ack_val]
+            
+            
+            #print ('SAM_RTT =',rtt, '___for flow=',direction,'__@ts=',pkt.ts)
+            sam_rtt = RTT(rtt, pkt.ts, direction)
+            rtt_map[direction][0].append(sam_rtt)
+            
+            if not(first_measurement_made):
+                first_measurement_made = True
+                srtt = rtt
+                rttvar = rtt / 2.0
+                rto = srtt + max(G, 4 * rttvar)
+            else:
+                rttvar = (1 - 0.25) * rttvar + 0.25 * abs(srtt - rtt)
+                srtt = (1 - 0.125) * srtt + 0.125 * rtt
+                rto = srtt + max(G, 4.0 * rttvar)
+            
+            #if (rto < 1.0):
+                #rto = 1.0
+            
+            est_rtt = RTT(rto, pkt.ts, direction)
+            rtt_map[direction][1].append(est_rtt)
+            #print ('EST_RTT =',rto, '___for flow=',direction,'__@ts=',pkt.ts)
+            
+            del (flow_key_map[reverse])[pkt.ack_val]
+            
+    
+    
+    
+    #print(direction,'___',flow_key_map[direction])
+    #print(reverse,'____',flow_key_map[reverse])
+    #print('___-------____')
+    
+    return rtt_map
