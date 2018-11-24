@@ -62,6 +62,16 @@ class FlowData:
         self.total_packets = len(pd_list)
         self.total_bytes = sum(p.size for p in pd_list)
         
+        ts_acc = -1
+        self.inter_arrival_times = []
+        for p in pd_list:
+            if (ts_acc < 0):
+                ts_acc = p.ts
+            else:
+                ts_diff = p.ts - ts_acc
+                self.inter_arrival_times.append(ts_diff)
+                ts_acc = p.ts
+        
         
         pkt1 = pd_list[0]
         pkt_lst = pd_list[len(pd_list) - 1]
