@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import packet_data as pd
 from dpkt.compat import compat_ord #this only used in the below helper functions for printing data
 
-#these two are helper functions copied from the examples on dpkt.readthedocs.io, may not be needed but should be cited
+#these two are helper functions copied from the examples on dpkt.readthedocs.io
 def mac_addr(address):
     """Convert a MAC address to a readable/printable string
 
@@ -350,7 +350,6 @@ print('Generating per-packet CDFs...')
 
 #plot_cdf_with_data(ip_packet_sizes, 'IP Packet Sizes')
 #plot_cdf_with_data(non_ip_packet_sizes, 'Non-IP Packet Sizes')
-
 #plot_cdf_with_data(ip_header_sizes, 'IP Header Sizes')
 #plot_cdf_with_data(tcp_header_sizes, 'TCP Header Sizes')
 #plot_cdf_with_data(udp_header_sizes, 'UDP Header Sizes')
@@ -394,11 +393,15 @@ all_flow_sizes = [[], []]
 tcp_flow_sizes = [[], []]
 udp_flow_sizes = [[], []]
 
+tcp_hit_ratios = []
+
 for flow in completed_tcp_flows:
     all_flow_sizes[0].append(flow.total_packets)
     all_flow_sizes[1].append(flow.total_bytes)
     tcp_flow_sizes[0].append(flow.total_packets)
     tcp_flow_sizes[1].append(flow.total_bytes)
+    
+    tcp_hit_ratios.append(flow.overhead_ratio)
 
 for flow in completed_udp_flows:
     all_flow_sizes[0].append(flow.total_packets)
@@ -412,6 +415,8 @@ for flow in completed_udp_flows:
 #plot_cdf_with_data(tcp_flow_sizes[1], 'TCP Flow Bytes')
 #plot_cdf_with_data(udp_flow_sizes[0], 'UDP Flow Packets')
 #plot_cdf_with_data(udp_flow_sizes[1], 'UDP Flow Bytes')
+
+#plot_cdf_with_data(tcp_hit_ratios, 'TCP Hit Ratio')
 
 print('------------------------------')
 
@@ -501,9 +506,9 @@ for key in host_pair_map:
     hp_list.append(hp)
     
 # Get the top 3 host-pairs in terms of # of flows
-top3_hp = sorted(hp_list, key=lambda hostPair:hostPair.length)[-3:]
+top3_hp = sorted(hp_list, key=lambda hostPair:hostPair.length)[-4:]
 
-top3_acc = 3
+top3_acc = len(top3_hp)
 for hp in top3_hp:
     rtt_list = []
     ts_list = []
@@ -539,12 +544,7 @@ for hp in top3_hp:
     
     title = 'Top 3 Host Pair Flow RTTs #{0}'.format(top3_acc)
     
-    #draw_rtt_time(rtt_list, ts_list, title, uselog=False)
-    
-    #if (len(rtt_list) == 0):
-        #print(hp.key)
-        #print(hp.flow_list[0].flow_key1)
-        #print(hp.flow_list[0].flow_key2)
+    #draw_rtt_time(rtt_list, ts_list, title, uselog=False
     
     top3_acc -= 1
     
